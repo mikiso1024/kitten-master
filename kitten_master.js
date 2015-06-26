@@ -216,7 +216,7 @@ var km = function() {
 
             if (building.unlocked) {
                 var prices = gamePage.bld.getPrices(name);
-                
+
                 for (var i = 0; i < prices.length; ++i) {
                     var res = gamePage.resPool.get(prices[i].name);
 
@@ -260,7 +260,7 @@ var km = function() {
             // TODO: some sort of logic...
             // TODO: calculate real ratios
             var min = Math.ceil(gamePage.getEffect('maxKittens') * 6.8);
-            
+
             if (field.val >= min) {
                 return buildItem('hut');
             }
