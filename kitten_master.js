@@ -1,6 +1,7 @@
 var km = function() {
     var timer = null;
 
+    var mustReassignJobs = false;
     var mustFarm = false;
     var oldJobs = null;
 
@@ -16,8 +17,16 @@ var km = function() {
         autoTrade: true,
         autoPray: true,
         autoBuild: true,
-        autoScience: true
+        autoScience: true,
+        autoUpgrade: true,
+        autoJob: true
     };
+
+    function refreshTabs () {
+        for (var i = 0; i < gamePage.tabs.length; ++i) {
+            gamePage.tabs[i].render();
+        }
+    }
 
     function getTab(tabId) {
         var tab = null;
@@ -114,7 +123,12 @@ var km = function() {
         if (module.autoCraft) {
             var craft = gamePage.workshop.getCraft(craftName);
 
-            if (craft.unlocked) {
+            /*
+             * Beam, slab, and plate are unlocked by default, but technically
+             * not craftable until you have a workshop.
+             */
+            if (craftName === 'wood' ||
+                (gamePage.workshopTab.visible && craft.unlocked)) {
                 for (var i = 0; i < craft.prices.length; ++i) {
                     var res = gamePage.resPool.get(craft.prices[i].name);
 
@@ -227,11 +241,13 @@ var km = function() {
 
                 // Now get the button so we can click it
                 console.log('Building: ' + name);
+                refreshTabs();
                 var tab = getTab('Bonfire');
                 pushTab(tab.tabId);
                 var button = getButton(tab, name);
                 button.onClick(button);
                 popTab();
+                mustReassignJobs = true;
                 return true;
             }
         }
@@ -239,14 +255,12 @@ var km = function() {
         return false;
     }
 
-    // Try to maintain the right number of fields to feed kittens with surplus
     function buildField() {
-        var building = gamePage.bld.getBuilding('field');
+        var field = gamePage.bld.getBuilding('field');
+        var hut = gamePage.bld.getBuilding('hut');
 
-        // TODO: calculate real ratios
-        var target = Math.ceil((gamePage.getEffect('maxKittens') + 2) * 6.8);
-
-        if (building.val < target) {
+        // For early game, don't be too greedy. we want a hut soon
+        if (hut.val || (field.val < 30)) {
             return buildItem('field');
         }
     }
@@ -258,12 +272,7 @@ var km = function() {
 
         if (gamePage.science.get('agriculture').researched) {
             // TODO: some sort of logic...
-            // TODO: calculate real ratios
-            var min = Math.ceil(gamePage.getEffect('maxKittens') * 6.8);
-
-            if (field.val >= min) {
-                return buildItem('hut');
-            }
+            return buildItem('hut');
         } else {
             // Only build 1 to help prevent winter deaths
             if (hut.val === 0) {
@@ -274,7 +283,7 @@ var km = function() {
 
     function build() {
         if (module.autoBuild) {
-            // DUMB IMPLEMENTATION; GREEDY (MOSTLY)
+            // DUMB IMPLEMENTATION; GREEDY
             for (var i = 0; i < gamePage.bld.buildingsData.length; ++i) {
                 var building = gamePage.bld.buildingsData[i];
 
@@ -283,12 +292,69 @@ var km = function() {
                     if (buildField()) {
                         break;
                     }
-                } else if (building.name === 'hut') {
-                    if (buildHut()) {
-                        break;
-                    }
                 } else if (buildItem(building.name)) {
                     break;
+                }
+            }
+        }
+    }
+
+    function assignJobs() {
+        if (module.autoJob && !mustFarm) {
+            if (!gamePage.village.jobs) {
+                pushTab(gamePage.villageTab.tabId);
+                popTab();
+            }
+
+            // Have we we've purchased buildings, science, or upgrades?
+            if (mustReassignJobs) {
+                console.log('Reassigning jobs');
+                gamePage.village.clearJobs();
+                mustReassignJobs = false;
+            }
+
+            // Assign a job to all free kittens
+            while (gamePage.village.getFreeKittens() > 0) {
+                // Make sure we have the latest data
+                gamePage.updateResources();
+
+                // DUMB IMPLEMENTATION; EQUALIZE RESOURCE RATES
+                var nextRate = 0;
+                var nextJob = null;
+
+                for (var i = 0; i < gamePage.village.jobs.length; ++i) {
+                    var job = gamePage.village.jobs[i];
+
+                    // only farm when absolutely necessary
+                    if (job.unlocked && (job.name !== 'farmer')) {
+                        // Make sure all available jobs have at least 1 worker
+                        if (job.value === 0) {
+                            nextJob = job;
+                            break;
+                        } else if (nextJob === null) {
+                            nextJob = job;
+                            for (var p in job.modifiers) {
+                                var res = gamePage.resPool.get(p);
+                                nextRate = res.perTickUI;
+                                // Only care about the first resource
+                                break;
+                            }
+                        } else {
+                            for (var p in job.modifiers) {
+                                var res = gamePage.resPool.get(p);
+                                if (res.perTickUI < nextRate) {
+                                    nextJob = job;
+                                    nextRate = res.perTickUI;
+                                }
+                                // Only care about the first resource
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (nextJob) {
+                    gamePage.village.assignJob(nextJob);
                 }
             }
         }
@@ -396,10 +462,58 @@ var km = function() {
 
                 if (canResearch(button)) {
                     console.log('Researching: ' + button.name);
-                    button.onClick();
+                    refreshTabs();
                     pushTab(tab.tabId);
+                    button.onClick();
                     popTab();
+                    mustReassignJobs = true;
                     // Only research one tech per run
+                    break;
+                }
+            }
+        }
+    }
+
+    function canUpgrade(button) {
+        var result = false;
+
+        if (button.enabled) {
+            result = true;
+
+            for (var i = 0; i < button.prices.length; ++i) {
+                var res = gamePage.resPool.get(button.prices[i].name);
+
+                if (res.value < button.prices[i].val) {
+                    result = false;
+                    break;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    function upgrade() {
+        if (module.autoUpgrade && gamePage.workshopTab.visible) {
+            var tab = gamePage.workshopTab;
+
+            if (tab.buttons.length === 0) {
+                pushTab(tab.tabId);
+                popTab();
+            }
+
+            // DUMB IMPLEMENTATION; GREEDY
+            for (var i = 0; i < tab.buttons.length; ++i) {
+                var button = tab.buttons[i];
+
+                if (canUpgrade(button)) {
+                    console.log('Upgrading: ' + button.name);
+                    refreshTabs();
+                    pushTab(tab.tabId);
+                    button.onClick();
+                    popTab();
+                    mustReassignJobs = true;
+                    // Only one upgrade per run
                     break;
                 }
             }
@@ -458,11 +572,13 @@ var km = function() {
                 observe();
                 gather();
                 science();
+                upgrade();
                 trade();
                 hunt();
                 craft();
                 build();
                 pray();
+                assignJobs();
                 farm();
             }, 100);
         }
@@ -478,3 +594,6 @@ var km = function() {
 
     return module;
 }();
+
+// Automatically start the Kitten Master
+km.start();
