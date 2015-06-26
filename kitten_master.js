@@ -171,6 +171,7 @@ var km = function() {
                     }
                 }
 
+                console.log('Crafting: ' + craft.name);
                 gamePage.craft(craft.name, amount);
             }
         }
@@ -327,61 +328,69 @@ var km = function() {
     }
 
     function assignJobs() {
-        if (module.autoJob && !mustFarm) {
+        if (module.autoJob) {
             if (!gamePage.village.jobs) {
                 pushTab(gamePage.villageTab.tabId);
                 popTab();
             }
 
-            // Have we we've purchased buildings, science, or upgrades?
-            if (mustReassignJobs) {
-                console.log('Reassigning jobs');
-                gamePage.village.clearJobs();
-                mustReassignJobs = false;
-            }
+            if (mustFarm) {
+                // If we are in emergency farm mode, all new kittens must farm
+                var job = gamePage.village.getJob('farmer');
+                while (gamePage.village.getFreeKittens() > 0) {
+                    gamePage.village.assignJob(job);
+                }
+            } else {
+                // Have we we've purchased buildings, science, or upgrades?
+                if (mustReassignJobs) {
+                    console.log('Reassigning jobs');
+                    gamePage.village.clearJobs();
+                    mustReassignJobs = false;
+                }
 
-            // Assign a job to all free kittens
-            while (gamePage.village.getFreeKittens() > 0) {
-                // Make sure we have the latest data
-                gamePage.updateResources();
+                // Assign a job to all free kittens
+                while (gamePage.village.getFreeKittens() > 0) {
+                    // Make sure we have the latest data
+                    gamePage.updateResources();
 
-                // DUMB IMPLEMENTATION; EQUALIZE RESOURCE RATES
-                var nextRate = 0;
-                var nextJob = null;
+                    // DUMB IMPLEMENTATION; EQUALIZE RESOURCE RATES
+                    var nextRate = 0;
+                    var nextJob = null;
 
-                for (var i = 0; i < gamePage.village.jobs.length; ++i) {
-                    var job = gamePage.village.jobs[i];
+                    for (var i = 0; i < gamePage.village.jobs.length; ++i) {
+                        var job = gamePage.village.jobs[i];
 
-                    // only farm when absolutely necessary
-                    if (job.unlocked && (job.name !== 'farmer')) {
-                        // Make sure all available jobs have at least 1 worker
-                        if (job.value === 0) {
-                            nextJob = job;
-                            break;
-                        } else if (nextJob === null) {
-                            nextJob = job;
-                            for (var p in job.modifiers) {
-                                var res = gamePage.resPool.get(p);
-                                nextRate = res.perTickUI;
-                                // Only care about the first resource
+                        // only farm when absolutely necessary
+                        if (job.unlocked && (job.name !== 'farmer')) {
+                            // Make sure all available jobs have at least 1 worker
+                            if (job.value === 0) {
+                                nextJob = job;
                                 break;
-                            }
-                        } else {
-                            for (var p in job.modifiers) {
-                                var res = gamePage.resPool.get(p);
-                                if (res.perTickUI < nextRate) {
-                                    nextJob = job;
+                            } else if (nextJob === null) {
+                                nextJob = job;
+                                for (var p in job.modifiers) {
+                                    var res = gamePage.resPool.get(p);
                                     nextRate = res.perTickUI;
+                                    // Only care about the first resource
+                                    break;
                                 }
-                                // Only care about the first resource
-                                break;
+                            } else {
+                                for (var p in job.modifiers) {
+                                    var res = gamePage.resPool.get(p);
+                                    if (res.perTickUI < nextRate) {
+                                        nextJob = job;
+                                        nextRate = res.perTickUI;
+                                    }
+                                    // Only care about the first resource
+                                    break;
+                                }
                             }
                         }
                     }
-                }
 
-                if (nextJob) {
-                    gamePage.village.assignJob(nextJob);
+                    if (nextJob) {
+                        gamePage.village.assignJob(nextJob);
+                    }
                 }
             }
         }
