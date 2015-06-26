@@ -8,7 +8,26 @@ var km = function() {
     var tabStack = [];
 
     var module = {
-        maxResPercent: 0.99,
+        resReserve: 0.99,
+        // TODO: determine real ratios instead of just 10x defaults
+        craftRatio: {
+            beam: 10, // Keep 10x as many beams as derived products
+            slab: 10,
+            concrate: 10, // Yes, this is misspelled in the game code
+            plate: 10,
+            steel: 10,
+            alloy: 10,
+            eludium: 10,
+            gear: 10,
+            parchment: 10,
+            manuscript: 10,
+            compedium: 10, // Yes, this is misspelled in the game code
+            blueprint: 10,
+            scaffold: 10,
+            ship: 10,
+            tanker: 10,
+            megalith: 10
+        },
         autoGather: true,
         autoFarm: true,
         autoObserve: true,
@@ -109,7 +128,7 @@ var km = function() {
                     var res = gamePage.resPool.get(button.prices[i].name);
 
                     if ((res.value < button.prices[i].val) ||
-                        (res.value < (res.maxValue * module.maxResPercent))) {
+                        (res.value < (res.maxValue * module.resReserve))) {
                         return;
                     }
                 }
@@ -119,41 +138,49 @@ var km = function() {
         }
     }
 
-    function craftItem(craftName, amount) {
+    function craftItem(craft, amount) {
         if (module.autoCraft) {
-            var craft = gamePage.workshop.getCraft(craftName);
-
             /*
              * Beam, slab, and plate are unlocked by default, but technically
              * not craftable until you have a workshop.
              */
-            if (craftName === 'wood' ||
+            if (craft.name === 'wood' ||
                 (gamePage.workshopTab.visible && craft.unlocked)) {
+                // The resource pool for the item we want to craft
+                var item = gamePage.resPool.get(craft.name);
+
                 for (var i = 0; i < craft.prices.length; ++i) {
                     var res = gamePage.resPool.get(craft.prices[i].name);
 
-                    // TODO: handle resources without max values
+                    /*
+                     * The ratio of items to components. Prevents components,
+                     * such as parchment, from being starved out of other uses,
+                     * such as amphitheaters.
+                     */
+                    var ratio = module.craftRatio[res.name];
+
+                    // Do we have enough resources to pay the price?
+                    // Do we have enough resources in reserve?
+                    // Do we have enough resources to maintain the item ratio?
                     if ((res.value < (craft.prices[i].val * amount)) ||
-                        (res.value < (res.maxValue * module.maxResPercent))) {
+                        (res.maxValue &&
+                         (res.value < (res.maxValue * module.resReserve))) ||
+                        (ratio &&
+                         (res.value < ((item.value + amount) * ratio)))) {
                         return;
                     }
                 }
 
-                gamePage.craft(craftName, amount);
+                gamePage.craft(craft.name, amount);
             }
         }
     }
 
     function craft() {
         if (module.autoCraft) {
-            craftItem('wood', 1);
-            craftItem('beam', 1);
-            craftItem('slab', 1);
-            craftItem('plate', 1);
-            craftItem('steel', 1);
-            craftItem('parchment', 1);
-            craftItem('manuscript', 1);
-            craftItem('compedium', 1);
+            for (var i = 0; i < gamePage.workshop.crafts.length; ++i) {
+                craftItem(gamePage.workshop.crafts[i], 1);
+            }
         }
     }
 
@@ -167,9 +194,9 @@ var km = function() {
         if (module.autoTrade && gamePage.diplomacyTab.visible &&
             race.unlocked &&
             (manpower.value >= 50) &&
-            (manpower.value >= (manpower.maxValue * module.maxResPercent)) &&
+            (manpower.value >= (manpower.maxValue * module.resReserve)) &&
             (gold.value >= 15) &&
-            (gold.value >= (gold.maxValue * module.maxResPercent))) {
+            (gold.value >= (gold.maxValue * module.resReserve))) {
 
             // We're good as long as we have enough resources to sell
             result = true;
@@ -406,7 +433,7 @@ var km = function() {
         if (module.autoPray) {
             var res = gamePage.resPool.get('faith');
 
-            if (res.value >= (res.maxValue * module.maxResPercent)) {
+            if (res.value >= (res.maxValue * module.resReserve)) {
                 gamePage.religion.praise();
             }
         }
@@ -585,10 +612,12 @@ var km = function() {
     }
 
     module.start = function() {
+        console.log('Kitten Master is playing.');
         module.auto(true);
     }
 
     module.stop = function() {
+        console.log('Kitten Master is sleeping.');
         module.auto(false);
     }
 
