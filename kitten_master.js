@@ -9,6 +9,7 @@ var km = function() {
 
     var module = {
         resReserve: 0.99,
+        fastCraft: true,
         // TODO: determine real ratios instead of just 10x defaults
         craftRatio: {
             beam: 10, // Keep 10x as many beams as derived products
@@ -26,7 +27,8 @@ var km = function() {
             scaffold: 10,
             ship: 10,
             tanker: 10,
-            megalith: 10
+            megalith: 10,
+            starchart: 10
         },
         autoGather: true,
         autoFarm: true,
@@ -149,30 +151,36 @@ var km = function() {
                 // The resource pool for the item we want to craft
                 var item = gamePage.resPool.get(craft.name);
 
-                for (var i = 0; i < craft.prices.length; ++i) {
-                    var res = gamePage.resPool.get(craft.prices[i].name);
+                /*
+                 * If fastCraft is true, this will keep crafting until the
+                 * inner loop returns due to a failed resource check
+                 * TODO: might be faster to calculate amount to craft?
+                 */
+                do {
+                    for (var i = 0; i < craft.prices.length; ++i) {
+                        var res = gamePage.resPool.get(craft.prices[i].name);
 
-                    /*
-                     * The ratio of items to components. Prevents components,
-                     * such as parchment, from being starved out of other uses,
-                     * such as amphitheaters.
-                     */
-                    var ratio = module.craftRatio[res.name];
+                        /*
+                         * The ratio of items to components. Prevents
+                         * components, such as parchment, from being starved
+                         * out of other uses, such as amphitheaters.
+                         */
+                        var ratio = module.craftRatio[res.name];
 
-                    // Do we have enough resources to pay the price?
-                    // Do we have enough resources in reserve?
-                    // Do we have enough resources to maintain the item ratio?
-                    if ((res.value < (craft.prices[i].val * amount)) ||
-                        (res.maxValue &&
-                         (res.value < (res.maxValue * module.resReserve))) ||
-                        (ratio &&
-                         (res.value < ((item.value + amount) * ratio)))) {
-                        return;
+                        // Do we have enough resources to pay the price?
+                        // Do we have enough resources in reserve?
+                        // Do we have enough resources to maintain the ratio?
+                        if ((res.value < craft.prices[i].val) ||
+                            (res.maxValue &&
+                             (res.value < (res.maxValue *
+                                           module.resReserve))) ||
+                            (ratio && (res.value < (item.value * ratio)))) {
+                            return;
+                        }
                     }
-                }
 
-                console.log('Crafting: ' + craft.name);
-                gamePage.craft(craft.name, amount);
+                    gamePage.craft(craft.name, 1);
+                } while (module.fastCraft);
             }
         }
     }
