@@ -168,7 +168,7 @@ var km = function() {
                  * which can be crafted.
                  */
                 if (module.fastCraft) {
-                    max_craft =  Number.MAX_VALUE;
+                    max_craft = Number.MAX_VALUE;
 
                     for (var i = 0; i < craft.prices.length; ++i) {
                         var res = gamePage.resPool.get(craft.prices[i].name);
@@ -202,6 +202,7 @@ var km = function() {
                             max_craft = Math.min(max_craft, tmax);
                         }
                     }
+                }
 
                 if (max_craft > 0) {
                     gamePage.craft(craft.name, max_craft);
@@ -655,17 +656,17 @@ var km = function() {
                 farm();
             }, 100);
         }
-    }
+    };
 
     module.start = function() {
         console.log('Kitten Master is playing.');
         module.auto(true);
-    }
+    };
 
     module.stop = function() {
         console.log('Kitten Master is sleeping.');
         module.auto(false);
-    }
+    };
 
     return module;
 }();
