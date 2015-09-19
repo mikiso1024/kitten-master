@@ -9,6 +9,7 @@ var km = function() {
 
     var module = {
         resReserve: 0.99,
+        fastCraft: true,
         // TODO: determine real ratios instead of just 10x defaults
         craftRatio: {
             beam: 10, // Keep 10x as many beams as derived products
@@ -30,7 +31,6 @@ var km = function() {
             starchart: 10
         },
         buildCap: {}, // add building name and maximum count to cap autoBuild
-        fastCraft: true,
         autoGather: true,
         autoFarm: true,
         autoObserve: true,
@@ -202,7 +202,6 @@ var km = function() {
                             max_craft = Math.min(max_craft, tmax);
                         }
                     }
-                }
 
                 if (max_craft > 0) {
                     gamePage.craft(craft.name, max_craft);
