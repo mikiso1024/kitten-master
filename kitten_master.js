@@ -26,19 +26,22 @@ var km = function() {
             scaffold: 10,
             ship: 10,
             tanker: 10,
-            megalith: 10
+            megalith: 10,
+            starchart: 10
         },
+        buildCap: {}, // add building name and maximum count to cap autoBuild
+        fastCraft: true,
         autoGather: true,
         autoFarm: true,
         autoObserve: true,
         autoHunt: true,
         autoCraft: true,
-        autoTrade: true,
+        autoTrade: false,
         autoPray: true,
         autoBuild: true,
         autoScience: true,
-        autoUpgrade: true,
-        autoJob: true
+        autoUpgrade: false,
+        autoJob: false
     };
 
     function refreshTabs () {
@@ -113,32 +116,41 @@ var km = function() {
     }
 
     function hunt() {
-        if (module.autoHunt && gamePage.science.get('archery').researched &&
-            gamePage.villageTab.visible) {
-            var button = gamePage.villageTab.huntBtn;
+        if (module.autoHunt && gamePage.science.get('archery').researched) {
+            if (gamePage.villageTab.visible) {
+                var button = gamePage.villageTab.huntBtn;
 
-            if (!button) {
-                pushTab(gamePage.villageTab.tabId);
-                button = gamePage.villageTab.huntBtn;
-                popTab();
-            }
-
-            if (button) {
-                for (var i = 0; i < button.prices.length; ++i) {
-                    var res = gamePage.resPool.get(button.prices[i].name);
-
-                    if ((res.value < button.prices[i].val) ||
-                        (res.value < (res.maxValue * module.resReserve))) {
-                        return;
-                    }
+                if (!button) {
+                    pushTab(gamePage.villageTab.tabId);
+                    button = gamePage.villageTab.huntBtn;
+                    popTab();
                 }
 
-                button.onClick(button);
+                if (button) {
+                    for (var i = 0; i < button.prices.length; ++i) {
+                        var res = gamePage.resPool.get(button.prices[i].name);
+
+                        if ((res.value < button.prices[i].val) ||
+                            (res.value < (res.maxValue * module.resReserve))) {
+                            return;
+                        }
+                    }
+
+                    if (button.enabled) {
+                        button.onClick(button);
+                    } else {
+                        // Must be in Iron Will mode, so just hunt all.
+                        gamePage.village.huntAll();
+                    }
+                }
+            } else {
+                // Must be in Iron Will mode, so just hunt all.
+                gamePage.village.huntAll();
             }
         }
     }
 
-    function craftItem(craft, amount) {
+    function craftItem(craft) {
         if (module.autoCraft) {
             /*
              * Beam, slab, and plate are unlocked by default, but technically
@@ -149,30 +161,52 @@ var km = function() {
                 // The resource pool for the item we want to craft
                 var item = gamePage.resPool.get(craft.name);
 
-                for (var i = 0; i < craft.prices.length; ++i) {
-                    var res = gamePage.resPool.get(craft.prices[i].name);
+                var max_craft = 1;
 
-                    /*
-                     * The ratio of items to components. Prevents components,
-                     * such as parchment, from being starved out of other uses,
-                     * such as amphitheaters.
-                     */
-                    var ratio = module.craftRatio[res.name];
+                /*
+                 * If fastCraft is true, this will determine the maximum amount
+                 * which can be crafted.
+                 */
+                if (module.fastCraft) {
+                    max_craft =  Number.MAX_VALUE;
 
-                    // Do we have enough resources to pay the price?
-                    // Do we have enough resources in reserve?
-                    // Do we have enough resources to maintain the item ratio?
-                    if ((res.value < (craft.prices[i].val * amount)) ||
-                        (res.maxValue &&
-                         (res.value < (res.maxValue * module.resReserve))) ||
-                        (ratio &&
-                         (res.value < ((item.value + amount) * ratio)))) {
-                        return;
+                    for (var i = 0; i < craft.prices.length; ++i) {
+                        var res = gamePage.resPool.get(craft.prices[i].name);
+                        var cost = craft.prices[i].val;
+
+                        /*
+                         * The ratio of items to components. Prevents
+                         * components, such as parchment, from being starved
+                         * out of other uses, such as amphitheaters.
+                         */
+                        var ratio = module.craftRatio[res.name];
+
+                        // How many can I craft...
+                        // ...from just this resource?
+                        var rmax = Math.floor(res.value / cost);
+                        max_craft = Math.min(max_craft, rmax);
+
+                        // ...while maintaining the resource reserve?
+                        if (res.maxValue) {
+                            var can_use = res.value -
+                                (res.maxValue * module.resReserve);
+                            var vmax = Math.floor(can_use / cost);
+                            max_craft = Math.min(max_craft, vmax);
+                        }
+
+                        // ...while maintaining the craft ratio?
+                        if (ratio) {
+                            var tmax =
+                                Math.floor((res.value - (item.value * ratio)) /
+                                           ratio);
+                            max_craft = Math.min(max_craft, tmax);
+                        }
                     }
                 }
 
-                console.log('Crafting: ' + craft.name);
-                gamePage.craft(craft.name, amount);
+                if (max_craft > 0) {
+                    gamePage.craft(craft.name, max_craft);
+                }
             }
         }
     }
@@ -180,7 +214,7 @@ var km = function() {
     function craft() {
         if (module.autoCraft) {
             for (var i = 0; i < gamePage.workshop.crafts.length; ++i) {
-                craftItem(gamePage.workshop.crafts[i], 1);
+                craftItem(gamePage.workshop.crafts[i]);
             }
         }
     }
@@ -257,26 +291,30 @@ var km = function() {
             var building = gamePage.bld.getBuilding(name);
 
             if (building.unlocked) {
-                var prices = gamePage.bld.getPrices(name);
+                // Skip if we've hit the configured max, if any
+                if (!module.buildCap[name] ||
+                    (building.val < module.buildCap[name])) {
+                    var prices = gamePage.bld.getPrices(name);
 
-                for (var i = 0; i < prices.length; ++i) {
-                    var res = gamePage.resPool.get(prices[i].name);
+                    for (var i = 0; i < prices.length; ++i) {
+                        var res = gamePage.resPool.get(prices[i].name);
 
-                    if (res.value < prices[i].val) {
-                        return false;
+                        if (res.value < prices[i].val) {
+                            return false;
+                        }
                     }
-                }
 
-                // Now get the button so we can click it
-                console.log('Building: ' + name);
-                refreshTabs();
-                var tab = getTab('Bonfire');
-                pushTab(tab.tabId);
-                var button = getButton(tab, name);
-                button.onClick(button);
-                popTab();
-                mustReassignJobs = true;
-                return true;
+                    // Now get the button so we can click it
+                    console.log('Building: ' + name);
+                    refreshTabs();
+                    var tab = getTab('Bonfire');
+                    pushTab(tab.tabId);
+                    var button = getButton(tab, name);
+                    button.onClick(button);
+                    popTab();
+                    mustReassignJobs = true;
+                    return true;
+                }
             }
         }
 
