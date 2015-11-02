@@ -37,6 +37,7 @@ var km = function() {
         autoHunt: true,
         autoCraft: true,
         autoTrade: false,
+        fastPray: false,
         autoPray: true,
         autoBuild: true,
         autoScience: true,
@@ -484,10 +485,14 @@ var km = function() {
 
     function pray() {
         if (module.autoPray) {
-            var res = gamePage.resPool.get('faith');
-
-            if (res.value >= (res.maxValue * module.resReserve)) {
+            if (module.fastPray) {
                 gamePage.religion.praise();
+            } else {
+                var res = gamePage.resPool.get('faith');
+
+                if (res.value >= (res.maxValue * module.resReserve)) {
+                    gamePage.religion.praise();
+                }
             }
         }
     }
