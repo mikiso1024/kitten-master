@@ -8,7 +8,7 @@ var km = function() {
     var tabStack = [];
 
     var module = {
-        resReserve: 0.99,
+        resReserve: 0.95,
         fastCraft: true,
         // TODO: determine real ratios instead of just 10x defaults
         craftRatio: {
@@ -191,6 +191,12 @@ var km = function() {
                             var can_use = res.value -
                                 (res.maxValue * module.resReserve);
                             var vmax = Math.floor(can_use / cost);
+
+                            // Craft at least 1 when over reserve
+                            if (res.value > (res.maxValue * km.resReserve)) {
+                                vmax = Math.max(1, vmax);
+                            }
+
                             max_craft = Math.min(max_craft, vmax);
                         }
 
