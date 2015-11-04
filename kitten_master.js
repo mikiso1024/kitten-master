@@ -36,7 +36,7 @@ var km = function() {
         autoObserve: true,
         autoHunt: true,
         autoCraft: true,
-        autoTrade: false,
+        autoTrade: true,
         fastPray: false,
         autoPray: true,
         autoBuild: true,
@@ -319,8 +319,10 @@ var km = function() {
 
     function trade() {
         if (module.autoTrade && gamePage.diplomacyTab.visible) {
-            // TODO: Try others besides Zebras
-            tradeWith('zebras');
+            // We always want to try Leviathans for time crystals
+            tradeWith('leviathans');
+
+            // TODO: Try others based on time of year and resource needs
         }
     }
 
