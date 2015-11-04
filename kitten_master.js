@@ -42,8 +42,38 @@ var km = function() {
         autoBuild: true,
         autoScience: true,
         autoUpgrade: false,
-        autoJob: false
+        autoJob: false,
     };
+
+    /**
+     * Randomize array element order in-place.
+     * Using Durstenfeld shuffle algorithm.
+     */
+    function shuffle(array) {
+        for (var i = array.length - 1; i > 0; --i) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var temp = array[i];
+            array[i] = array[j];
+            array[j] = temp;
+        }
+
+        return array;
+    }
+
+    /*
+     * Keep a cached copy of the crafts array so we can randomize in place
+     * prior to auto crafting. We do this so one craft, such as plates, doesn't
+     * prevent the crafting of another, in this case steel, by consuming all of
+     * the required resources on each tick.
+     */
+    module.crafts = shuffle(gamePage.workshop.crafts.slice(0));
+
+    /*
+     * Keep a cached copy of the buildings array so we can randomize in place
+     * prior to auto building. We do this so one building doesn't consume all
+     * resources before another building has a chance to be built.
+     */
+    module.buildings = shuffle(gamePage.bld.buildingsData.slice(0));
 
     function refreshTabs () {
         for (var i = 0; i < gamePage.tabs.length; ++i) {
@@ -212,6 +242,7 @@ var km = function() {
                 }
 
                 if (max_craft > 0) {
+                    console.log('Crafting: ' + craft.name);
                     gamePage.craft(craft.name, max_craft);
                 }
             }
@@ -220,8 +251,10 @@ var km = function() {
 
     function craft() {
         if (module.autoCraft) {
-            for (var i = 0; i < gamePage.workshop.crafts.length; ++i) {
-                craftItem(gamePage.workshop.crafts[i]);
+            shuffle(module.crafts);
+
+            for (var i = 0; i < module.crafts.length; ++i) {
+                craftItem(module.crafts[i]);
             }
         }
     }
@@ -357,8 +390,10 @@ var km = function() {
     function build() {
         if (module.autoBuild) {
             // DUMB IMPLEMENTATION; GREEDY
-            for (var i = 0; i < gamePage.bld.buildingsData.length; ++i) {
-                var building = gamePage.bld.buildingsData[i];
+            shuffle(module.buildings);
+
+            for (var i = 0; i < module.buildings.length; ++i) {
+                var building = module.buildings[i];
 
                 // Only build one building per run
                 if (building.name === 'field') {
