@@ -242,7 +242,6 @@ var km = function() {
                 }
 
                 if (max_craft > 0) {
-                    console.log('Crafting: ' + craft.name);
                     gamePage.craft(craft.name, max_craft);
                 }
             }
