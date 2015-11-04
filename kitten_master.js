@@ -41,7 +41,7 @@ var km = function() {
         autoPray: true,
         autoBuild: true,
         autoScience: true,
-        autoUpgrade: false,
+        autoUpgrade: true,
         autoJob: false,
     };
 
@@ -593,16 +593,16 @@ var km = function() {
         }
     }
 
-    function canUpgrade(button) {
+    function canUpgrade(upgrade) {
         var result = false;
 
-        if (button.enabled) {
+        if (upgrade.unlocked && !upgrade.researched) {
             result = true;
 
-            for (var i = 0; i < button.prices.length; ++i) {
-                var res = gamePage.resPool.get(button.prices[i].name);
+            for (var i = 0; i < upgrade.prices.length; ++i) {
+                var res = gamePage.resPool.get(upgrade.prices[i].name);
 
-                if (res.value < button.prices[i].val) {
+                if (res.value < upgrade.prices[i].val) {
                     result = false;
                     break;
                 }
@@ -612,26 +612,34 @@ var km = function() {
         return result;
     }
 
+    function clickUpgradeButton(upgrade) {
+        refreshTabs();
+        var tab = gamePage.workshopTab;
+        pushTab(tab.tabId);
+
+        for (var i = 0; i < tab.buttons.length; ++i) {
+            var button = tab.buttons[i];
+
+            if (button.upgradeName == upgrade.name) {
+                console.log('Upgrading: ' + upgrade.name);
+                button.onClick();
+                mustReassignJobs = true;
+                break;
+            }
+        }
+
+        popTab();
+    }
+
     function upgrade() {
         if (module.autoUpgrade && gamePage.workshopTab.visible) {
-            var tab = gamePage.workshopTab;
-
-            if (tab.buttons.length === 0) {
-                pushTab(tab.tabId);
-                popTab();
-            }
 
             // DUMB IMPLEMENTATION; GREEDY
-            for (var i = 0; i < tab.buttons.length; ++i) {
-                var button = tab.buttons[i];
+            for (var i = 0; i < gamePage.workshop.upgrades.length; ++i) {
+                var upgrade = gamePage.workshop.upgrades[i];
 
-                if (canUpgrade(button)) {
-                    console.log('Upgrading: ' + button.name);
-                    refreshTabs();
-                    pushTab(tab.tabId);
-                    button.onClick();
-                    popTab();
-                    mustReassignJobs = true;
+                if (canUpgrade(upgrade)) {
+                    clickUpgradeButton(upgrade);
                     // Only one upgrade per run
                     break;
                 }
