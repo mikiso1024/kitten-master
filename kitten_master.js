@@ -31,6 +31,10 @@ var km = function() {
             starchart: 10
         },
         buildCap: {}, // add building name and maximum count to cap autoBuild
+        // Anything in the ignore list will not be built/researched/upgraded
+        ignore: {
+            tachyonTheory: true // currently this tech is useless
+        },
         autoGather: true,
         autoFarm: true,
         autoObserve: true,
@@ -182,7 +186,7 @@ var km = function() {
     }
 
     function craftItem(craft) {
-        if (module.autoCraft) {
+        if (module.autoCraft && !module.ignore[craft.name]) {
             /*
              * Beam, slab, and plate are unlocked by default, but technically
              * not craftable until you have a workshop.
@@ -267,6 +271,7 @@ var km = function() {
 
         if (module.autoTrade && gamePage.diplomacyTab.visible &&
             race.unlocked &&
+            !module.ignore[raceName] &&
             (manpower.value >= 50) &&
             (manpower.value >= (manpower.maxValue * module.resReserve)) &&
             (gold.value >= 15) &&
@@ -328,7 +333,7 @@ var km = function() {
 
     // Returns true if the item was built
     function buildItem(name) {
-        if (module.autoBuild) {
+        if (module.autoBuild && !module.ignore[name]) {
             var building = gamePage.bld.getBuilding(name);
 
             if (building.unlocked) {
@@ -552,7 +557,7 @@ var km = function() {
 
         var tech = getTech(button.techName);
 
-        if (tech.unlocked && !tech.researched) {
+        if (tech.unlocked && !tech.researched && !module.ignore[tech.name]) {
             result = true;
 
             for (var i = 0; i < button.prices.length; ++i) {
@@ -598,7 +603,8 @@ var km = function() {
     function canUpgrade(upgrade) {
         var result = false;
 
-        if (upgrade.unlocked && !upgrade.researched) {
+        if (upgrade.unlocked && !upgrade.researched &&
+            !module.ignore[upgrade.name]) {
             result = true;
 
             for (var i = 0; i < upgrade.prices.length; ++i) {
