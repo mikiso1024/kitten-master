@@ -81,7 +81,9 @@ var km = function() {
 
     function refreshTabs () {
         for (var i = 0; i < gamePage.tabs.length; ++i) {
-            gamePage.tabs[i].render();
+            if (gamePage.tabs[i].tabId !== 'Stats') {
+                gamePage.tabs[i].render();
+            }
         }
     }
 
