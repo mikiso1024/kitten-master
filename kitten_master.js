@@ -30,6 +30,7 @@ var km = function() {
             megalith: 10,
             starchart: 10
         },
+        fastBuild: true,
         buildCap: {}, // add building name and maximum count to cap autoBuild
         // Anything in the ignore list will not be built/researched/upgraded
         ignore: {
@@ -333,37 +334,61 @@ var km = function() {
         }
     }
 
-    // Returns true if the item was built
-    function buildItem(name) {
+    function canBuild(name) {
+        var result = false;
+
         if (module.autoBuild && !module.ignore[name]) {
             var building = gamePage.bld.getBuilding(name);
 
-            if (building.unlocked) {
-                // Skip if we've hit the configured max, if any
-                if (!module.buildCap[name] ||
-                    (building.val < module.buildCap[name])) {
-                    var prices = gamePage.bld.getPrices(name);
+            // Skip if we've hit the configured max, if any
+            if (building.unlocked &&
+                (!module.buildCap[name] ||
+                 (building.val < module.buildCap[name]))) {
+                // We're good as long as we have enough resources to sell
+                result = true;
 
-                    for (var i = 0; i < prices.length; ++i) {
-                        var res = gamePage.resPool.get(prices[i].name);
+                var prices = gamePage.bld.getPrices(name);
 
-                        if (res.value < prices[i].val) {
-                            return false;
-                        }
+                for (var i = 0; i < prices.length; ++i) {
+                    var res = gamePage.resPool.get(prices[i].name);
+
+                    if (res.value < prices[i].val) {
+                        result = false;
+                        break;
                     }
-
-                    // Now get the button so we can click it
-                    console.log('Building: ' + name);
-                    refreshTabs();
-                    var tab = getTab('Bonfire');
-                    pushTab(tab.tabId);
-                    var button = getButton(tab, name);
-                    button.onClick(button);
-                    popTab();
-                    mustReassignJobs = true;
-                    return true;
                 }
             }
+        }
+
+        return result;
+    }
+
+    // Returns true if the item was built
+    function buildItem(name) {
+        if (canBuild(name)) {
+            // Now get the button so we can click it
+            refreshTabs();
+            var tab = getTab('Bonfire');
+            pushTab(tab.tabId);
+            var button = getButton(tab, name);
+
+            button.onClick(button);
+            var count = 1;
+
+            // If fast build mode is enable, build as many as we can
+            if (module.fastBuild) {
+                while (canBuild(name)) {
+                    button.onClick(button);
+                    count++;
+                }
+            }
+
+            popTab();
+            mustReassignJobs = true;
+
+            console.log('Built ' + count + ' ' + name);
+
+            return true;
         }
 
         return false;
@@ -405,10 +430,10 @@ var km = function() {
 
                 // Only build one building per run
                 if (building.name === 'field') {
-                    if (buildField()) {
+                    if (buildField() && !module.fastBuild) {
                         break;
                     }
-                } else if (buildItem(building.name)) {
+                } else if (buildItem(building.name) && !module.fastBuild) {
                     break;
                 }
             }
