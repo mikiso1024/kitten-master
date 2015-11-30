@@ -733,6 +733,3 @@ var km = function() {
 
     return module;
 }();
-
-// Automatically start the Kitten Master
-km.start();
